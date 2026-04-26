@@ -550,6 +550,76 @@ app.post('/api/presence/rotate/stop', (req, res) => {
   } catch (e) { fail(res, e); }
 });
 
+// ── Avatar update (single or many tokens)
+app.post('/api/presence/avatar', async (req, res) => {
+  try {
+    const { tokens = [], avatar } = req.body; // avatar = data URL or http URL
+    if (!avatar) return fail(res, new Error('No avatar provided'));
+    const targets = (tokens.length ? tokens : (activeName ? [activeName] : []));
+    const results = [];
+    for (const n of targets) {
+      const c = getClientByName(n);
+      if (!c) { results.push({ name: n, ok: false, error: 'not connected' }); continue; }
+      try {
+        await c.user.setAvatar(avatar);
+        results.push({ name: n, ok: true });
+      } catch (e) {
+        results.push({ name: n, ok: false, error: e.message });
+      }
+      await sleep(jitter(400, 1000));
+    }
+    ok(res, { results });
+  } catch (e) { fail(res, e); }
+});
+
+// ── Human-like activity simulator (online ↔ idle ↔ invisible at random intervals)
+const activityTimers = new Map(); // name -> timeoutId
+function scheduleNextCycle(name, modes, minMs, maxMs) {
+  const c = getClientByName(name);
+  if (!c) return;
+  const next = jitter(minMs, maxMs);
+  const id = setTimeout(() => {
+    try {
+      const cur = c.user.presence?.status || 'online';
+      const choices = modes.filter(m => m !== cur);
+      const pick = choices.length ? choices[Math.floor(Math.random() * choices.length)] : modes[0];
+      c.user.setStatus(resolvePresence(pick));
+    } catch (e) {}
+    scheduleNextCycle(name, modes, minMs, maxMs);
+  }, next);
+  activityTimers.set(name, id);
+}
+
+app.post('/api/presence/activity/start', (req, res) => {
+  try {
+    const { tokens = [], modes = ['online','idle','invisible'], minSec = 60, maxSec = 600 } = req.body;
+    const minMs = Math.max(15, parseInt(minSec)) * 1000;
+    const maxMs = Math.max(minMs + 1000, parseInt(maxSec) * 1000);
+    const targets = (tokens.length ? tokens : (activeName ? [activeName] : []));
+    for (const n of targets) {
+      if (activityTimers.has(n)) clearTimeout(activityTimers.get(n));
+      scheduleNextCycle(n, modes, minMs, maxMs);
+    }
+    ok(res, { simulating: targets });
+  } catch (e) { fail(res, e); }
+});
+
+app.post('/api/presence/activity/stop', (req, res) => {
+  try {
+    const { tokens = [] } = req.body;
+    const targets = (tokens.length ? tokens : Array.from(activityTimers.keys()));
+    for (const n of targets) {
+      const id = activityTimers.get(n);
+      if (id) { clearTimeout(id); activityTimers.delete(n); }
+    }
+    ok(res, { stopped: targets });
+  } catch (e) { fail(res, e); }
+});
+
+app.get('/api/presence/activity/list', (req, res) => {
+  ok(res, { running: Array.from(activityTimers.keys()) });
+});
+
 // ═══════════════════════════════════════════════
 //  MESSAGES MANAGER (send / repeat / schedule)
 // ═══════════════════════════════════════════════

@@ -325,8 +325,22 @@ export class MessagesManager {
     };
   }
 
+  // Show every test-mode action as a Discord-style preview toast
+  _testPreview(action, p) {
+    if (!window._testMode) return;
+    const where =
+      p.scope?.type === 'channel' ? `channel${(p.scope.channelIds || []).length > 1 ? 's' : ''}` :
+      p.scope?.type === 'all_channels' ? 'all server channels' :
+      p.scope?.type === 'all_dms' ? 'all DMs' :
+      p.scope?.type === 'all_groups' ? 'all groups' : 'target';
+    (p.messages || []).forEach((m, i) => {
+      window.showTestPreview?.(action, m, where, i + 1, (p.messages || []).length);
+    });
+  }
+
   async actionSendNow() {
     const p = this.buildPayload(); if (!p) return;
+    this._testPreview('send', p);
     showNotification('Sending…');
     try {
       const r = await window.electronAPI.sendMessages(p);
@@ -340,6 +354,7 @@ export class MessagesManager {
     const p = this.buildPayload(); if (!p) return;
     p.intervalMs = Math.max(2000, (this.intervalSec || 60) * 1000);
     p.count = this.repeatCount || 0;
+    this._testPreview('repeat', p);
     try {
       const r = await window.electronAPI.startRepeat(p);
       if (r.success) showNotification(`Job started: ${r.jobId}`); else showNotification('Failed: ' + r.error);
@@ -350,6 +365,7 @@ export class MessagesManager {
     const p = this.buildPayload(); if (!p) return;
     if (!this.scheduleAt) { showNotification('Pick a date/time'); return; }
     p.runAt = new Date(this.scheduleAt).toISOString();
+    this._testPreview('schedule', p);
     try {
       const r = await window.electronAPI.scheduleMessage(p);
       if (r.success) showNotification(`Scheduled in ${(r.runIn / 1000) | 0}s`); else showNotification('Failed: ' + r.error);

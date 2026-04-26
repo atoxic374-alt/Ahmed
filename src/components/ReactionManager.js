@@ -178,6 +178,11 @@ export class ReactionManager {
     const buttonNames = (this.buttons || '').split(/[,]+/).map(s => s.trim()).filter(Boolean);
     if (this.mode === 'specific' && !emojis.length && !buttonNames.length) return showNotification('Add emojis or button names');
 
+    if (window._testMode) {
+      const desc = `${scope.type === 'all' ? 'all targets' : scope.type + ':' + scope.id}`;
+      const text = `mode=${this.mode} ${this.mode === 'specific' ? `emojis=[${emojis.join(',')}] buttons=[${buttonNames.join(',')}]` : '(mirror author)'}`;
+      window.showTestPreview?.('react', text, desc, 1, 1);
+    }
     try {
       const r = await window.electronAPI.startReactions({ tokens: this.tokens, scope, mode: this.mode, emojis, buttonNames });
       if (r.success) { showNotification(`Listener started: ${r.listenerId}`); this.switchTab('active'); }

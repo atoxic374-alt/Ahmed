@@ -8,9 +8,13 @@ import { OldManager } from './components/OldManager.js';
 import { MessagesManager } from './components/MessagesManager.js';
 import { ReactionManager } from './components/ReactionManager.js';
 import { TokensManager } from './components/TokensManager.js';
-import { showInfoModal } from './utils/ui.js';
+import { showInfoModal, showTestPreview } from './utils/ui.js';
 import { copyToClipboard } from './utils/clipboard.js';
 import { getFriendsList } from './utils/discord.js';
+import { applyLang, setLang, getLang, t } from './utils/i18n.js';
+
+window.t = t;
+window.showTestPreview = showTestPreview;
 
 // ── Theme toggle ──
 (function initTheme() {
@@ -26,6 +30,28 @@ document.getElementById('themeToggleBtn')?.addEventListener('click', () => {
   if (btn) btn.textContent = isLight ? '☀️' : '🌙';
   localStorage.setItem('theme', isLight ? 'light' : 'dark');
 });
+
+// ── Language toggle ──
+applyLang();
+document.getElementById('langToggleBtn')?.addEventListener('click', () => {
+  setLang(getLang() === 'ar' ? 'en' : 'ar');
+});
+
+// ── Mobile nav drawer ──
+(function initNavToggle() {
+  const sidebar = document.getElementById('navSidebar');
+  const backdrop = document.getElementById('navBackdrop');
+  const toggle = document.getElementById('navToggleBtn');
+  const close = () => { sidebar?.classList.remove('open'); backdrop?.classList.remove('show'); };
+  toggle?.addEventListener('click', () => {
+    const open = sidebar?.classList.toggle('open');
+    backdrop?.classList.toggle('show', !!open);
+  });
+  backdrop?.addEventListener('click', close);
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.nav-item') && window.innerWidth <= 880) close();
+  });
+})();
 
 // Discord-style default avatar (used for Test mode)
 const DISCORD_DEFAULT_AVATAR = `data:image/svg+xml;utf8,${encodeURIComponent(`

@@ -92,8 +92,12 @@ window.electronAPI = {
   // ── Presence / Status / Bio
   setPresence:    (payload) => testOr(TEST_RESPONSES.ok) || apiCall('POST', '/api/presence/set', payload),
   setBio:         (payload) => testOr(TEST_RESPONSES.ok) || apiCall('POST', '/api/presence/bio', payload),
+  setAvatar:      (payload) => testOr(TEST_RESPONSES.ok) || apiCall('POST', '/api/presence/avatar', payload),
   startRotation:  (payload) => testOr(TEST_RESPONSES.ok) || apiCall('POST', '/api/presence/rotate/start', payload),
   stopRotation:   (payload) => testOr(TEST_RESPONSES.ok) || apiCall('POST', '/api/presence/rotate/stop', payload),
+  startActivity:  (payload) => testOr(TEST_RESPONSES.ok) || apiCall('POST', '/api/presence/activity/start', payload),
+  stopActivity:   (payload) => testOr(TEST_RESPONSES.ok) || apiCall('POST', '/api/presence/activity/stop', payload),
+  listActivity:   () => testOr({ success: true, running: [] }) || apiCall('GET', '/api/presence/activity/list'),
 
   // ── Messages Manager
   sendMessages:    (payload) => testOr(TEST_RESPONSES.results) || apiCall('POST', '/api/messages/send', payload),

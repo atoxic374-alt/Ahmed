@@ -15,6 +15,42 @@ export const showNotification = (message) => {
   setTimeout(() => notification.remove(), 2000);
 };
 
+// Discord-style preview toast for test mode — shows what would have been sent.
+export const showTestPreview = (action, text, where, idx, total) => {
+  const tag = ({ send: 'SEND', repeat: 'REPEAT', schedule: 'SCHEDULE', react: 'REACT' }[action] || 'TEST');
+  const card = document.createElement('div');
+  card.className = 'test-preview-card';
+  const safe = String(text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  card.innerHTML = `
+    <div class="tp-head">
+      <div class="tp-av">
+        <svg viewBox="0 0 64 64" width="36" height="36">
+          <rect width="64" height="64" rx="32" fill="#5865F2"/>
+          <path fill="#fff" d="M44.6 19.5c-2.3-1-4.7-1.8-7.3-2.2-.3.6-.7 1.4-1 2-2.7-.4-5.4-.4-8 0-.3-.6-.7-1.4-1-2-2.5.5-5 1.3-7.3 2.3-4.6 6.9-5.8 13.6-5.2 20.2 3.1 2.3 6 3.7 8.9 4.6.7-1 1.4-2 1.9-3.1-1.1-.4-2.1-.9-3.1-1.5.3-.2.5-.4.8-.6 5.9 2.7 12.4 2.7 18.3 0 .3.2.5.4.8.6-1 .6-2 1.1-3.1 1.5.6 1.1 1.2 2.1 1.9 3.1 2.9-.9 5.8-2.3 8.9-4.6.7-7.7-1.2-14.3-5.2-20.2zM25.4 36.1c-1.8 0-3.2-1.6-3.2-3.6s1.4-3.6 3.2-3.6 3.3 1.6 3.2 3.6c0 2-1.4 3.6-3.2 3.6zm13.1 0c-1.8 0-3.2-1.6-3.2-3.6s1.4-3.6 3.2-3.6 3.3 1.6 3.2 3.6c0 2-1.4 3.6-3.2 3.6z"/>
+        </svg>
+      </div>
+      <div class="tp-meta">
+        <div class="tp-name">Ahmed (Test) <span class="tp-tag">${tag}</span></div>
+        <div class="tp-where">→ ${where} ${total > 1 ? `· #${idx}/${total}` : ''}</div>
+      </div>
+      <button class="tp-x" aria-label="close">×</button>
+    </div>
+    <div class="tp-body">${safe || '<em>(empty message)</em>'}</div>
+    <div class="tp-foot">AHMED · @4_3a</div>
+  `;
+  card.querySelector('.tp-x').addEventListener('click', () => card.remove());
+  let host = document.getElementById('test-preview-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'test-preview-host';
+    document.body.appendChild(host);
+  }
+  host.appendChild(card);
+  setTimeout(() => card.classList.add('in'), 10);
+  setTimeout(() => { card.classList.remove('in'); card.classList.add('out'); }, 6500);
+  setTimeout(() => card.remove(), 7200);
+};
+
 export const showProgressModal = (title, total) => {
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';

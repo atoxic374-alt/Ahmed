@@ -10,18 +10,19 @@ A web-based Discord account manager built originally as an Electron desktop app,
 
 ### Key Files
 
-- `server.js` — Express server: multi-client pool, anti-detection helpers, all REST endpoints.
+- `server.js` — Express server: multi-client pool, anti-detection helpers, all REST endpoints (presence, bio, avatar, status rotation, activity simulator, messages, reactions).
 - `src/api.js` — Browser-side shim that replaces `window.electronAPI` with fetch calls.
-- `src/main.js` — Frontend entry point and page router.
+- `src/main.js` — Frontend entry point, theme + language toggle, mobile drawer.
+- `src/utils/i18n.js` — Bilingual (English / Arabic) translation system with full RTL support.
 - `src/components/` — UI managers:
   - Friends, Servers, DMs, Groups (legacy)
-  - **TokensManager** — multi-account control, presence, bio, status rotation, per-token actions menu
-  - **MessagesManager** — send to server channels / all DMs / all groups, multi-message panels, repeat (fast/natural), schedule
-  - **ReactionManager** — auto-react with mirror or specific emojis, auto-click buttons by name (server / DM / group / all)
-  - **OldManager** (DM/Group) — message cards now include a **Copy Link** button
-- `src/utils/` — Helpers: `tokenManager`, `messageDeleter` (parallel + adaptive throttle), `ui` (notifications, modals)
-- `src/styles/managers.css` — Styles for the new managers
-- `saved_tokens.json` — Persisted Discord tokens (local file)
+  - **TokensManager** — multi-account hub. Tabs: Accounts · Presence · Bio · **Avatar** · Rotate Status · **Activity Simulator**. Every tab supports both per-selection and **Apply to ALL connected** actions.
+  - **MessagesManager** — send to server channels / all DMs / all groups, multi-message panels, repeat (fast/natural), schedule. In test mode every action shows a Discord-style preview toast.
+  - **ReactionManager** — auto-react with mirror or specific emojis, auto-click buttons by name. Test mode shows preview toast.
+  - **OldManager** (DM/Group) — message cards include a **Copy Link** button.
+- `src/utils/` — Helpers: `tokenManager`, `messageDeleter` (parallel + adaptive throttle), `ui` (notifications, modals, **showTestPreview**), `i18n`.
+- `src/styles/managers.css` — Styles for new managers + animations + RTL + responsive + test preview toast.
+- `saved_tokens.json` — Persisted Discord tokens (local file).
 
 ## Multi-account / anti-detection
 
