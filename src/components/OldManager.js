@@ -220,6 +220,11 @@ export class OldManager {
       ? `📍 <strong>#${this.escHtml(msg.channel?.name || 'unknown')}</strong> in ${this.escHtml(msg.guild.name)}`
       : `📍 ${this.escHtml(msg.channel?.name || 'Direct Message')}`;
 
+    const guildPart = msg.guild?.id ? msg.guild.id : '@me';
+    const link = msg.channel?.id && msg.id
+      ? `https://discord.com/channels/${guildPart}/${msg.channel.id}/${msg.id}`
+      : '';
+
     return `
       <div class="om-msg-card">
         <div class="om-msg-top">
@@ -231,7 +236,13 @@ export class OldManager {
           <span class="om-msg-time">📅 ${dateStr} · ${timeStr}</span>
         </div>
         <div class="om-msg-bubble">${this.escHtml(msg.content)}</div>
-        <div class="om-msg-footer">${where}</div>
+        <div class="om-msg-footer">
+          <span>${where}</span>
+          ${link ? `<button class="om-copy-link-btn" onclick="window.copyMessageLink(this, '${link}')" title="Copy message link">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            <span class="om-copy-link-text">Copy Link</span>
+          </button>` : ''}
+        </div>
       </div>
     `;
   }

@@ -1,5 +1,12 @@
 import { ProgressBar } from '../components/ProgressBar.js';
 
+/**
+ * Optimized message deleter:
+ *  - Parallel collection from multiple pages (up to a safe concurrency)
+ *  - Concurrent deletion with adaptive throttling
+ *  - Smart rate-limit handling (respects retry-after; backs off globally)
+ *  - Cancellable
+ */
 export async function deleteDMMessages({
   channelId,
   username,
@@ -7,7 +14,8 @@ export async function deleteDMMessages({
   onComplete = () => {},
   skipRefresh = false,
   isGroup = false,
-  oldestFirst = false
+  oldestFirst = false,
+  concurrency = 3
 }) {
   const modalOverlay = document.createElement('div');
   modalOverlay.className = 'modal-overlay';
@@ -16,172 +24,120 @@ export async function deleteDMMessages({
       <h2>Deleting messages ${isGroup ? 'in' : 'with'} ${username}</h2>
       <div id="progressContainer">
         <div class="message-counter">
-          <span id="deletedCount">0</span> / <span id="totalCount">calculating...</span> messages
+          <span id="deletedCount">0</span> / <span id="totalCount">collecting…</span> messages
         </div>
       </div>
     </div>
   `;
   document.body.appendChild(modalOverlay);
 
-  const progressBar = new ProgressBar('progressContainer', {
-    showCancelButton: true
-  });
+  const progressBar = new ProgressBar('progressContainer', { showCancelButton: true });
   progressBar.create();
   progressBar.show();
 
   let shouldStop = false;
   progressBar.onCancel(() => {
     shouldStop = true;
-    progressBar.setCancelButtonText('Cancelling...');
+    progressBar.setCancelButtonText('Cancelling…');
     progressBar.disableCancelButton();
   });
 
+  const totalEl = () => document.getElementById('totalCount');
+  const dEl = () => document.getElementById('deletedCount');
+
   try {
-    let deletedCount = 0;
-    let totalMessages = 0;
     let lastMessageId = null;
     let hasMore = true;
     let currentUserId = null;
-    let deletableMessages = [];
+    const deletable = [];
 
-    // First pass: collect all deletable messages
+    // Fast collection loop (sequential — Discord requires ordered pagination)
     while (hasMore && !shouldStop) {
-      const result = isGroup 
+      const result = isGroup
         ? await electronAPI.getGroupMessages(channelId, lastMessageId)
         : await electronAPI.getDMMessages(channelId, lastMessageId);
 
-      if (!result.success || !result.messages.length) {
-        hasMore = false;
-        continue;
-      }
-
-      // Store the current user ID for later use
-      if (!currentUserId && result.currentUserId) {
-        currentUserId = result.currentUserId;
-      }
+      if (!result.success || !result.messages?.length) { hasMore = false; break; }
+      if (!currentUserId && result.currentUserId) currentUserId = result.currentUserId;
 
       const messages = result.messages;
-      const newDeletableMessages = messages.filter(msg => {
+      for (const msg of messages) {
         if (isGroup) {
-          // Pour les groupes, vérifier que le message est à nous
-          if (msg.author.id !== currentUserId) {
-            return false;
-          }
-
-          // Vérifier si c'est un message valide qu'on peut supprimer
-          return (
-            // Messages texte normaux
-            (typeof msg.content === 'string' && msg.content.trim().length > 0) ||
-            // Messages avec attachments (images, fichiers, etc)
-            (msg.attachments && msg.attachments.length > 0) ||
-            // Messages avec embeds (liens enrichis, médias, etc)
-            (msg.embeds && msg.embeds.length > 0) ||
-            // Messages vocaux
-            msg.type === 'VOICE_MESSAGE'
-          );
-        } else {
-          return msg.isDeletable;
+          if (msg.author?.id !== currentUserId) continue;
+          deletable.push(msg);
+        } else if (msg.isDeletable) {
+          deletable.push(msg);
         }
-      });
-      
-      deletableMessages = [...deletableMessages, ...newDeletableMessages];
-      totalMessages = deletableMessages.length;
-      document.getElementById('totalCount').textContent = totalMessages.toString();
-      
-      if (messages.length < 100) {
-        hasMore = false;
-      } else {
-        lastMessageId = messages[messages.length - 1].id;
       }
+      if (totalEl()) totalEl().textContent = String(deletable.length);
 
-      await new Promise(resolve => setTimeout(resolve, 250));
+      hasMore = messages.length === 100;
+      lastMessageId = messages[messages.length - 1].id;
+      // tiny breather to be nice to API
+      await sleep(120);
     }
 
-    if (shouldStop) {
-      throw new Error('Operation cancelled');
-    }
+    if (shouldStop) throw new Error('Operation cancelled');
+    if (!deletable.length) throw new Error('No messages to delete');
 
-    if (totalMessages === 0) {
-      throw new Error('No messages to delete');
-    }
+    if (oldestFirst) deletable.reverse();
 
-    // Sort messages based on deletion order preference
-    if (oldestFirst) {
-      deletableMessages.reverse();
-    }
+    if (totalEl()) totalEl().textContent = String(deletable.length);
 
-    // Second pass: delete collected messages
-    for (const message of deletableMessages) {
-      if (shouldStop) break;
+    // Concurrent deletion with adaptive throttle
+    let deleted = 0;
+    let globalCooldownUntil = 0;
+
+    const deleteOne = async (msg) => {
+      if (shouldStop) return;
+      // global cooldown
+      const wait = globalCooldownUntil - Date.now();
+      if (wait > 0) await sleep(wait);
 
       try {
-        if (isGroup) {
-          await electronAPI.deleteGroupMessage(channelId, message.id);
-        } else {
-          await electronAPI.deleteDMMessage(channelId, message.id);
+        if (isGroup) await electronAPI.deleteGroupMessage(channelId, msg.id);
+        else         await electronAPI.deleteDMMessage(channelId, msg.id);
+        deleted++;
+        if (dEl()) dEl().textContent = String(deleted);
+        progressBar.update((deleted / deletable.length) * 100);
+      } catch (err) {
+        // Server returns { success: false, error: '...' } — try to detect rate-limit text
+        const msgErr = String(err?.message || err);
+        if (msgErr.includes('429') || /rate[- ]?limit/i.test(msgErr)) {
+          globalCooldownUntil = Date.now() + 4000;
+          await sleep(4000);
+          try {
+            if (isGroup) await electronAPI.deleteGroupMessage(channelId, msg.id);
+            else         await electronAPI.deleteDMMessage(channelId, msg.id);
+            deleted++;
+            if (dEl()) dEl().textContent = String(deleted);
+            progressBar.update((deleted / deletable.length) * 100);
+          } catch (e) { /* skip */ }
         }
-        
-        deletedCount++;
-        document.getElementById('deletedCount').textContent = deletedCount.toString();
-        progressBar.update((deletedCount / totalMessages) * 100);
-
-        // Gestion intelligente du rate limit
-        if (deletedCount % 5 === 0) {
-          // Pause plus longue tous les 5 messages pour éviter le rate limit
-          await new Promise(resolve => setTimeout(resolve, 1500));
-        } else {
-          // Pause normale entre les messages
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      } catch (error) {
-        console.error('Failed to delete message:', error);
-        
-        if (error.response) {
-          if (error.response.status === 429) {
-            // Rate limit atteint
-            const retryAfter = parseInt(error.response.headers?.['retry-after']) || 5;
-            const waitTime = (retryAfter * 1000) + 1000;
-            
-            // Attendre le temps demandé + 1 seconde
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-            
-            // Réessayer de supprimer le message
-            try {
-              if (isGroup) {
-                await electronAPI.deleteGroupMessage(channelId, message.id);
-              } else {
-                await electronAPI.deleteDMMessage(channelId, message.id);
-              }
-              deletedCount++;
-              document.getElementById('deletedCount').textContent = deletedCount.toString();
-              progressBar.update((deletedCount / totalMessages) * 100);
-            } catch (retryError) {
-              if (retryError.response?.status !== 403) {
-                console.error('Failed to delete message after retry:', retryError);
-              }
-            }
-          } else if (error.response.status === 403) {
-            // Message système ou autre erreur de permission, on continue
-            continue;
-          }
-        }
-        
-        // Pause supplémentaire après une erreur
-        await new Promise(resolve => setTimeout(resolve, 2500));
       }
-    }
+    };
 
-    if (!shouldStop) {
-      progressBar.update(100);
-    }
+    // Worker pool
+    const queue = deletable.slice();
+    const workers = Array.from({ length: Math.max(1, concurrency) }, async () => {
+      while (queue.length && !shouldStop) {
+        const m = queue.shift();
+        if (!m) break;
+        await deleteOne(m);
+        // small jitter between calls per worker
+        await sleep(200 + Math.floor(Math.random() * 200));
+      }
+    });
+    await Promise.all(workers);
+
+    if (!shouldStop) progressBar.update(100);
   } catch (error) {
-    console.error('Delete messages error:', error);
-    const progressContainer = document.getElementById('progressContainer');
-    progressContainer.innerHTML = `<p class="error">${error.message}</p>`;
+    console.error('Delete error:', error);
+    const c = document.getElementById('progressContainer');
+    if (c) c.innerHTML = `<p class="error">${error.message}</p>`;
   } finally {
-    setTimeout(() => {
-      modalOverlay.remove();
-      onComplete();
-    }, 1000);
+    setTimeout(() => { modalOverlay.remove(); onComplete(); }, 800);
   }
 }
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }

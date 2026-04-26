@@ -217,6 +217,15 @@ body {
   justify-content: center;
   font-weight: 600;
   color: #fff;
+  flex-shrink: 0;
+}
+
+.user-avatar-img {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid rgba(88,101,242,0.4);
 }
 
 .user-info { flex: 1; min-width: 0; }
