@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Discord Presence Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;700;900&family=Changa:wght@600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="hero card">
+      <div class="hero__copy">
+        <p class="eyebrow">🌙 Discord Presence Studio</p>
+        <h1>تحكم بحالة <span>Streaming</span> لبوتك الرسمي بواجهة نيون فخمة.</h1>
+        <p class="lede">تنفيذ فعلي عبر Discord Bot API: تخصيص، تطبيق فوري، حفظ بعد التحديث، وإعادة اتصال تلقائي بعد تشغيل المشروع — بدون سيلف بوت أو أساليب تخفي مخالفة.</p>
+        <div class="policy-note">🛡️ آمن ومتوافق: استخدم Bot Token فقط. توكنات حسابات المستخدمين والسيلف بوت غير مدعومة.</div>
+      </div>
+      <div class="orb" aria-hidden="true">🎮</div>
+    </section>
+
+    <section class="grid">
+      <form class="card panel" id="connectForm">
+        <div class="section-title">
+          <span>01</span>
+          <div>
+            <h2>الاتصال الفعلي</h2>
+            <p>ضع توكن البوت الرسمي من Developer Portal.</p>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Bot Token</span>
+          <input id="token" type="password" autocomplete="off" placeholder="MTA... Bot token" />
+        </label>
+
+        <label class="switch">
+          <input id="autoReconnect" type="checkbox" />
+          <span></span>
+          <strong>إعادة الاتصال تلقائيًا عند إعادة تشغيل المشروع</strong>
+        </label>
+
+        <div class="button-row">
+          <button class="btn primary" type="submit">⚡ Connect</button>
+          <button class="btn ghost" type="button" id="disconnectBtn">⏻ Disconnect</button>
+          <button class="btn danger-lite" type="button" id="clearTokenBtn">🧹 Clear token</button>
+        </div>
+
+        <div class="bot-card" id="botCard">
+          <img id="botAvatar" src="/discord-mark.svg" alt="Bot avatar" />
+          <div>
+            <strong id="botName">غير متصل</strong>
+            <p id="botMeta">الحالة: Offline</p>
+          </div>
+          <span class="status-dot" id="statusDot"></span>
+        </div>
+      </form>
+
+      <form class="card panel" id="presenceForm">
+        <div class="section-title">
+          <span>02</span>
+          <div>
+            <h2>تخصيص الستريمنق</h2>
+            <p>Discord يدعم Twitch و YouTube للـ Streaming URL.</p>
+          </div>
+        </div>
+
+        <label class="switch big">
+          <input id="enabled" type="checkbox" />
+          <span></span>
+          <strong>تفعيل Streaming الآن</strong>
+        </label>
+
+        <label class="field">
+          <span>اسم البث</span>
+          <input id="streamName" maxlength="128" placeholder="مثال: Building a midnight dashboard" />
+        </label>
+
+        <label class="field">
+          <span>رابط البث</span>
+          <input id="streamUrl" placeholder="https://twitch.tv/discord أو https://youtube.com/..." />
+        </label>
+
+        <label class="field">
+          <span>نص الحالة المساعد</span>
+          <input id="state" maxlength="128" placeholder="مثال: Live control room ✨" />
+        </label>
+
+        <label class="field">
+          <span>Discord Status</span>
+          <select id="status">
+            <option value="online">Online — أخضر</option>
+            <option value="idle">Idle — أصفر</option>
+            <option value="dnd">Do Not Disturb — أحمر</option>
+            <option value="invisible">Invisible — مخفي للبوت</option>
+          </select>
+        </label>
+
+        <div class="button-row sticky-actions">
+          <button class="btn primary" type="submit">🚀 Apply now</button>
+          <button class="btn stop" type="button" id="stopBtn">🛑 Stop Streaming</button>
+        </div>
+      </form>
+
+      <aside class="card preview">
+        <div class="section-title">
+          <span>03</span>
+          <div>
+            <h2>معاينة جذابة</h2>
+            <p>شكل قريب من بطاقة presence داخل Discord.</p>
+          </div>
+        </div>
+
+        <div class="discord-preview">
+          <div class="avatar-wrap">
+            <img id="previewAvatar" src="/discord-mark.svg" alt="Preview avatar" />
+            <span id="previewStatus" class="mini-status online"></span>
+          </div>
+          <div class="preview-body">
+            <strong id="previewName">Your Bot</strong>
+            <p class="activity-line"><span class="live-pill">LIVE</span> <span id="previewStreamName">Designing a neon Discord dashboard</span></p>
+            <a id="previewUrl" href="https://twitch.tv/discord" target="_blank" rel="noreferrer">https://twitch.tv/discord</a>
+            <p id="previewState" class="state-line">لوحة بث آمنة ✨</p>
+          </div>
+        </div>
+
+        <div class="insights">
+          <div><b id="savedState">محفوظ</b><span>حفظ تلقائي</span></div>
+          <div><b id="tokenState">لا يوجد</b><span>التوكن</span></div>
+          <div><b id="lastApplied">—</b><span>آخر تطبيق</span></div>
+        </div>
+
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      </aside>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
